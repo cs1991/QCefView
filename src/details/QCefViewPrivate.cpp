@@ -1,4 +1,4 @@
-#include "QCefViewPrivate.h"
+﻿#include "QCefViewPrivate.h"
 
 #pragma region std_headers
 #include <stdexcept>
@@ -96,7 +96,7 @@ QCefViewPrivate::createCefBrowser(QCefView* view, const QString url, const QCefS
     CefWindowHandle p = (CefWindowHandle)(w.winId());
     window_info.SetAsChild(p, { 0, 0, 0, 0 });
 #else
-#if CEF_VERSION_MAJOR > 91
+#if CEF_VERSION_MAJOR >= 91
     window_info.SetAsChild((CefWindowHandle)view->winId(), { 0, 0, view->maximumWidth(), view->maximumHeight() });
 #else
     window_info.SetAsChild((CefWindowHandle)view->winId(), 0, 0, view->maximumWidth(), view->maximumHeight());
