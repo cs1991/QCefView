@@ -24,6 +24,13 @@ signals:
 protected slots:
   void onScreenChanged(QScreen* screen);
 
+  virtual bool onBeforePopup(qint64 frameId,
+                             const QString& targetUrl,
+                             const QString& targetFrameName,
+                             QCefView::CefWindowOpenDisposition targetDisposition,
+                             QCefSetting& settings,
+                             bool& DisableJavascriptAccess);
+
 private:
   virtual void onBrowserWindowCreated(QWindow* win);
 

@@ -42,7 +42,17 @@ CefViewWidget::resizeEvent(QResizeEvent* event)
   QCefView::resizeEvent(event);
   updateMask();
 }
-
+bool
+CefViewWidget::onBeforePopup(qint64 frameId,
+    const QString& targetUrl,
+    const QString& targetFrameName,
+    QCefView::CefWindowOpenDisposition targetDisposition,
+    QCefSetting& settings,
+    bool& DisableJavascriptAccess)
+{
+  navigateToUrl(targetUrl);
+  return true;
+}
 void
 CefViewWidget::updateMask()
 {

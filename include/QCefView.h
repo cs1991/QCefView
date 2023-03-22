@@ -233,6 +233,11 @@ public:
   bool isPopupContextMenuDisabled();
 
 signals:
+  // alt+Q，退出键盘事件
+  void quitKeyEvent();
+  // alt+M 最小化键盘事件
+  void minKeyEvent();
+
   /// <summary>
   /// Gets called on loading state changed
   /// </summary>

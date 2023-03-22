@@ -1,4 +1,4 @@
-#include "CCefClientDelegate.h"
+﻿#include "CCefClientDelegate.h"
 
 #include <QDebug>
 
@@ -49,7 +49,48 @@ CCefClientDelegate::onPreKeyEvent(CefRefPtr<CefBrowser> browser,
     }
   }
 #endif
+#if defined(Q_OS_WIN)
+    if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == VK_F12 &&
+      (event.modifiers & EVENTFLAG_CONTROL_DOWN)) {
+    printf("ctrl + F12 enter\n");
+    CefWindowInfo windowInfo;
+    CefBrowserSettings settings;
+    windowInfo.SetAsPopup(NULL, "DevTools");
+    browser->GetHost()->ShowDevTools(windowInfo, pCefViewPrivate_->pClient_, settings, CefPoint());
+    return true;
+  } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == VK_F5 &&
+             (event.modifiers & EVENTFLAG_CONTROL_DOWN)) {
+    printf("ctrl + F5 enter\n");
+    browser->Reload();
+    return true;
+  } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == 0x51 &&
+             (event.modifiers & EVENTFLAG_ALT_DOWN)) {
+    printf("ctrl + Q enter\n");
+    pCefViewPrivate_->q_ptr->quitKeyEvent();
+    return true;
+  } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == 0x4D &&
+             (event.modifiers & EVENTFLAG_ALT_DOWN)) {
+    printf("ctrl + M enter\n");
+    pCefViewPrivate_->q_ptr->minKeyEvent();
+    return true;
+  } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == VK_LWIN) {
+    return true;
+  }
+#else
+  XKeyEvent* xevent = static_cast<XKeyEvent*>(os_event.get());
+  if (xevent == nullptr) {
+    return false;
+  }
 
+  // 获取按下的键的键码
+  KeySym keysym = XLookupKeysym(xevent, 0);
+  if (keysym == XK_F5) {
+    // F5 被按下，执行相应的操作
+    // ...
+    return true;
+  }
+#endif
+        
   return false;
 }
 
