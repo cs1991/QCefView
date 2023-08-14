@@ -17,6 +17,7 @@ source_group(
 
 file(GLOB QCefView_SRC_FILES
   "${CMAKE_CURRENT_SOURCE_DIR}/*.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/*.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
 source_group(

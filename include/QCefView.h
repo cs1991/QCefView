@@ -21,11 +21,12 @@
 #include <QVariantList>
 #include <QWidget>
 #include <QWindow>
+
 #pragma endregion qt_headers
 
 class QCefViewPrivate;
-
-/// <summary>
+class QCefDevtoolsView;
+  /// <summary>
 /// Represents the CEF browser view
 /// </summary>
 class QCEFVIEW_EXPORT QCefView : public QWidget
@@ -34,6 +35,7 @@ class QCEFVIEW_EXPORT QCefView : public QWidget
   Q_DECLARE_PRIVATE(QCefView)
   Q_DISABLE_COPY(QCefView)
   QScopedPointer<QCefViewPrivate> d_ptr;
+  QScopedPointer<QCefDevtoolsView> dev_ptr;
 
 public:
   /// <summary>
@@ -237,7 +239,8 @@ signals:
   void quitKeyEvent();
   // alt+M 最小化键盘事件
   void minKeyEvent();
-
+  // 调试窗口
+  void showDevToolsEvent();
   /// <summary>
   /// Gets called on loading state changed
   /// </summary>
@@ -387,6 +390,11 @@ public slots:
                              QCefView::CefWindowOpenDisposition targetDisposition,
                              QCefSetting& settings,
                              bool& DisableJavascriptAccess);
+  /// <summary>
+  /// 打开和关闭devtools
+  /// </summary>
+  void onShowDevtools();
+  void closeDevtools();
 
 protected:
   /// <summary>

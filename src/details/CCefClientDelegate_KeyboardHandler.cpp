@@ -53,14 +53,25 @@ CCefClientDelegate::onPreKeyEvent(CefRefPtr<CefBrowser> browser,
     if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == VK_F12 &&
       (event.modifiers & EVENTFLAG_CONTROL_DOWN)) {
     printf("ctrl + F12 enter\n");
-    CefWindowInfo windowInfo;
+   /* CefWindowInfo windowInfo;
     CefBrowserSettings settings;
     windowInfo.SetAsPopup(NULL, "DevTools");
-    browser->GetHost()->ShowDevTools(windowInfo, pCefViewPrivate_->pClient_, settings, CefPoint());
+    browser->GetHost()->ShowDevTools(windowInfo, pCefViewPrivate_->pClient_, settings, CefPoint());*/
+    pCefViewPrivate_->q_ptr->showDevToolsEvent();
     return true;
-  } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == VK_F5 &&
+    } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == 0x44 &&
+               (event.modifiers & EVENTFLAG_CONTROL_DOWN) && (event.modifiers & EVENTFLAG_ALT_DOWN)) {
+      printf("ctrl + alt+ D enter\n");
+      pCefViewPrivate_->q_ptr->showDevToolsEvent();
+      return true;
+    } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == VK_F5 &&
              (event.modifiers & EVENTFLAG_CONTROL_DOWN)) {
     printf("ctrl + F5 enter\n");
+    browser->Reload();
+    return true;
+    } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == 0x52 &&
+             (event.modifiers & EVENTFLAG_CONTROL_DOWN) && (event.modifiers & EVENTFLAG_ALT_DOWN)) {
+    printf("ctrl + alt+ R enter\n");
     browser->Reload();
     return true;
   } else if (event.type == KEYEVENT_RAWKEYDOWN && event.windows_key_code == 0x51 &&
