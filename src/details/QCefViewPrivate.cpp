@@ -9,7 +9,6 @@
 #include <QDebug>
 #include <QInputMethodQueryEvent>
 #include <QPainter>
-#include <QPlatformSurfaceEvent>
 #include <QVBoxLayout>
 #include <QWindow>
 #pragma endregion qt_headers
@@ -30,6 +29,9 @@
 #include "utils/KeyboardUtils.h"
 #include "utils/MenuBuilder.h"
 #include "utils/ValueConvertor.h"
+
+#define DEFAULT_POPUP_WIDTH 800
+#define DEFAULT_POPUP_HEIGHT 600
 
 QSet<QCefViewPrivate*> QCefViewPrivate::sLiveInstances;
 
@@ -96,7 +98,7 @@ QCefViewPrivate::createCefBrowser(QCefView* view, const QString url, const QCefS
     CefWindowHandle p = (CefWindowHandle)(w.winId());
     window_info.SetAsChild(p, { 0, 0, 0, 0 });
 #else
-#if CEF_VERSION_MAJOR >= 91
+#if CEF_VERSION_MAJOR > 85
     window_info.SetAsChild((CefWindowHandle)view->winId(), { 0, 0, view->maximumWidth(), view->maximumHeight() });
 #else
     window_info.SetAsChild((CefWindowHandle)view->winId(), 0, 0, view->maximumWidth(), view->maximumHeight());
@@ -134,7 +136,6 @@ QCefViewPrivate::createCefBrowser(QCefView* view, const QString url, const QCefS
 
   pClient_ = pClient;
   pClientDelegate_ = pClientDelegate;
-  return;
 }
 
 void
@@ -155,6 +156,14 @@ QCefViewPrivate::destroyCefBrowser()
   pClient_->CloseAllBrowsers();
   pClient_ = nullptr;
   pCefBrowser_ = nullptr;
+}
+
+void
+QCefViewPrivate::closeAllPopupBrowsers()
+{
+  for (auto popup : popupBrowsers_) {
+    popup->close();
+  }
 }
 
 void
@@ -194,10 +203,15 @@ QCefViewPrivate::isOSRModeEnabled() const
 }
 
 void
-QCefViewPrivate::onCefMainBrowserCreated(CefRefPtr<CefBrowser>& browser, QWindow* window)
+QCefViewPrivate::onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* window)
 {
   // capture the browser
   pCefBrowser_ = browser;
+
+  // if last url is not empty, need to navigate to it
+  if (!lastUrl_.empty()) {
+    browser->GetMainFrame()->LoadURL(lastUrl_);
+  }
 
   // #if defined(CEF_USE_OSR)
   if (isOSRModeEnabled_) {
@@ -216,8 +230,8 @@ QCefViewPrivate::onCefMainBrowserCreated(CefRefPtr<CefBrowser>& browser, QWindow
       );
     }
   } else { // #else
-    // call slot
-    q_ptr->onBrowserWindowCreated(window);
+    // emit signal
+    q_ptr->nativeBrowserCreated(window);
 
     // create QWidget from cef browser widow, this will re-parent the CEF browser window
     QWidget* browserWidget = QWidget::createWindowContainer(
@@ -249,14 +263,73 @@ QCefViewPrivate::onCefMainBrowserCreated(CefRefPtr<CefBrowser>& browser, QWindow
     UpdateCefWindowMask(ncw.qBrowserWindow_, q_ptr->mask());
   }
   // #endif
+
+  // if is popup browser record and show
+  if (isPopup_) {
+    // record
+    popupBrowsers_.insert(q_ptr);
+
+    // show
+    q_ptr->show();
+
+    // emit the signal
+    q_ptr->popupCreated(q_ptr);
+  }
 }
 
 void
-QCefViewPrivate::onCefPopupBrowserCreated(CefRefPtr<CefBrowser>& browser, QWindow* window)
+QCefViewPrivate::onBeforeCefPopupCreate(const CefRefPtr<CefBrowser>& browser,
+                                        int64_t frameId,
+                                        const std::string& targetUrl,
+                                        const std::string& targetFrameName,
+                                        CefLifeSpanHandler::WindowOpenDisposition targetDisposition,
+                                        const CefWindowInfo& windowInfo,
+                                        const CefBrowserSettings& settings)
 {
   Q_Q(QCefView);
 
-  q->onPopupCreated(window);
+  auto url = QString::fromStdString(targetUrl);
+  auto name = QString::fromStdString(targetFrameName);
+  auto d = (QCefView::CefWindowOpenDisposition)targetDisposition;
+
+#if CEF_VERSION_MAJOR > 91
+  auto rc = QRect(windowInfo.bounds.x, windowInfo.bounds.y, windowInfo.bounds.width, windowInfo.bounds.height);
+#else
+  auto rc = QRect(windowInfo.x, windowInfo.y, windowInfo.width, windowInfo.height);
+#endif
+  
+  if (rc.width() <= 0) {
+    rc.setWidth(DEFAULT_POPUP_WIDTH);
+  }
+
+  if (rc.height() <= 0) {
+    rc.setHeight(DEFAULT_POPUP_HEIGHT);
+  }
+
+  QCefSetting s;
+  QCefSettingPrivate::CopyFromCefBrowserSettings(&s, &settings);
+
+  if (q->onBeforePopup(frameId, url, name, d, rc, s)) {
+    // cancel popup
+    return;
+  }
+
+  // allow popup, create QCefView as new popup browser
+  QCefView* popup = new QCefView(url, &s, nullptr, Qt::Window);
+  if (!popup) {
+    // failed to create QCefView, cancel popup
+    return;
+  }
+  popup->d_ptr->isPopup_ = true;
+
+  connect(popup, SIGNAL(destroyed(QObject*)), this, SLOT(onPopupBrowserDestroyed(QObject*)));
+
+  // config the popup QCefView
+  if (!name.isEmpty()) {
+    popup->setWindowTitle(name);
+  }
+  popup->setAttribute(Qt::WA_DeleteOnClose, true);
+  popup->resize(rc.size());
 }
 
 void
@@ -293,6 +366,12 @@ QCefViewPrivate::handleLoadError(CefRefPtr<CefBrowser>& browser,
   }
 
   return false;
+}
+
+void
+QCefViewPrivate::onPopupBrowserDestroyed(QObject* popup)
+{
+  popupBrowsers_.remove(static_cast<QCefView*>(popup));
 }
 
 void
@@ -528,7 +607,13 @@ QCefViewPrivate::onRunCefContextMenu(QPoint pos, CefRefPtr<CefRunContextMenuCall
 
   // show context menu
   osr.isShowingContextMenu_ = true;
+#if QT_VERSION < QT_VERSION_CHECK(6, 4, 0)
   QContextMenuEvent* e = new QContextMenuEvent(QContextMenuEvent::Other, pos);
+#else
+  QPoint globalPos = q->mapToGlobal(pos);
+  QContextMenuEvent* e =
+    new QContextMenuEvent(QContextMenuEvent::Other, pos, globalPos, QGuiApplication::keyboardModifiers());
+#endif
   qApp->sendEvent(q, e);
 }
 
@@ -536,6 +621,44 @@ void
 QCefViewPrivate::onCefContextMenuDismissed()
 {
   osr.contextMenuCallback_ = nullptr;
+}
+
+bool
+QCefViewPrivate::hasDevTools()
+{
+  if (pCefBrowser_) {
+    CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
+    if (host) {
+      return host->HasDevTools();
+    }
+  }
+
+  return false;
+}
+
+void
+QCefViewPrivate::showDevTools()
+{
+  if (pCefBrowser_) {
+    CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
+    if (host) {
+      CefWindowInfo info;
+      CefBrowserSettings settings;
+      CefPoint point;
+      host->ShowDevTools(info, nullptr, settings, point);
+    }
+  }
+}
+
+void
+QCefViewPrivate::closeDevTools()
+{
+  if (pCefBrowser_) {
+    CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
+    if (host) {
+      host->CloseDevTools();
+    }
+  }
 }
 
 bool
@@ -638,7 +761,7 @@ QCefViewPrivate::onViewInputMethodEvent(QInputMethodEvent* event)
     } else if (!composingText.isEmpty()) {
       CefCompositionUnderline underline;
       underline.background_color = 0;
-      underline.range = { 0, (int)composingText.length() };
+      underline.range = { 0, static_cast<decltype(CefRange::to)>(composingText.length()) };
 
       CefRange selectionRange;
       for (auto& attr : event->attributes()) {
@@ -862,24 +985,32 @@ QCefViewPrivate::browserId()
   return -1;
 }
 
+bool
+QCefViewPrivate::isPopup()
+{
+  return isPopup_;
+}
+
 void
 QCefViewPrivate::navigateToString(const QString& content)
 {
+  std::string data = content.toStdString();
+  data = CefURIEncode(CefBase64Encode(data.c_str(), data.size()), false).ToString();
+  data = "data:text/html;base64," + data;
+  lastUrl_.FromString(data);
+
   if (pCefBrowser_) {
-    std::string data = content.toStdString();
-    data = CefURIEncode(CefBase64Encode(data.c_str(), data.size()), false).ToString();
-    data = "data:text/html;base64," + data;
-    pCefBrowser_->GetMainFrame()->LoadURL(data);
+    pCefBrowser_->GetMainFrame()->LoadURL(lastUrl_);
   }
 }
 
 void
 QCefViewPrivate::navigateToUrl(const QString& url)
 {
+  lastUrl_.FromString(url.toStdString());
+
   if (pCefBrowser_) {
-    CefString strUrl;
-    strUrl.FromString(url.toStdString());
-    pCefBrowser_->GetMainFrame()->LoadURL(strUrl);
+    pCefBrowser_->GetMainFrame()->LoadURL(lastUrl_);
   }
 }
 

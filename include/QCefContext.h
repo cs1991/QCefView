@@ -1,4 +1,4 @@
-/*
+﻿/*
  * File: QCefContext.h
  * Project: QCefView
  * Created: 29th March 2016
@@ -6,8 +6,8 @@
  * Source: https://github.com/cefview/qcefview
  * Docs: https://cefview.github.io/QCefView/
  */
-#ifndef QCEF_H
-#define QCEF_H
+#ifndef QCEFCONTEXT_H
+#define QCEFCONTEXT_H
 #pragma once
 #include <QCefView_global.h>
 
@@ -82,6 +82,44 @@ public:
   bool addCookie(const QString& name, const QString& value, const QString& domain, const QString& url);
 
   /// <summary>
+  /// Deletes all cookies from the CEF context
+  /// </summary>
+  /// <returns>True on success; otherwise false</returns>
+  bool deleteAllCookies();
+
+  /// <summary>
+  /// Adds an entry to the cross-origin access whitelist. For details please refer to:
+  /// https://github.com/chromiumembedded/cef/blob/605c2bac86415dcec1e2902cdc46dc11c1ad026a/include/cef_origin_whitelist.h#L81C23-L81C23
+  /// </summary>
+  /// <param name="sourceOrigin">The source origin</param>
+  /// <param name="targetSchema">The target schema</param>
+  /// <param name="targetDomain">The target domain</param>
+  /// <param name="allowTargetSubdomains">Whether to allow subdomain or not</param>
+  /// <returns>True on success; otherwise false</returns>
+  bool addCrossOriginWhitelistEntry(const QString& sourceOrigin,
+                                    const QString& targetSchema,
+                                    const QString& targetDomain,
+                                    bool allowTargetSubdomains);
+
+  /// <summary>
+  /// Removes an entry from the cross-origin access whitelist. For details please refer to:
+  /// https://github.com/chromiumembedded/cef/blob/605c2bac86415dcec1e2902cdc46dc11c1ad026a/include/cef_origin_whitelist.h#L91C12-L91C12
+  /// </summary>
+  /// <param name="sourceOrigin">The source origin</param>
+  /// <param name="targetSchema">The target schema</param>
+  /// <param name="targetDomain">The target domain</param>
+  /// <returns>True on success; otherwise false</returns>
+  bool removeCrossOriginWhitelistEntry(const QString& sourceOrigin,
+                                       const QString& targetSchema,
+                                       const QString& targetDomain,
+                                       bool allowTargetSubdomains);
+
+  /// <summary>
+  /// Removes all entries from the cross-origin access whitelist.
+  /// </summary>
+  bool clearCrossOriginWhitelistEntry();
+
+  /// <summary>
   /// Gets the QCefConfig
   /// </summary>
   /// <returns>The QCefConfig instance</returns>
@@ -107,4 +145,4 @@ private:
   static QCefContext* s_self;
 };
 
-#endif // QCEF_H
+#endif // QCEFCONTEXT_H

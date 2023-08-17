@@ -1,4 +1,6 @@
 ﻿#include "CommonUtils.h"
+#include <QPainterPath>
+#include <QTransform>
 #include <QWidget>
 #include <QWindow>
 
@@ -20,7 +22,14 @@ QRegionToHRGN(const QRegion& region)
   }
 
   HRGN resultRgn = 0;
-  QVector<QRect> rects = region.rects();
+
+  QVector<QRect> rects;
+#if (QT_VERSION < QT_VERSION_CHECK(5, 11, 0))
+  rects = region.rects();
+#else
+  std::copy(region.begin(), region.end(), std::back_inserter(rects));
+#endif
+
   resultRgn = QRectToHRGN(rects.at(0));
   const int size = rects.size();
   for (int i = 1; i < size; i++) {
@@ -76,10 +85,14 @@ UpdateCefWindowMask(QWindow* w, const QRegion& r)
     // ncw.qBrowserWindow_->setMask(q->mask());
 #if defined(Q_OS_WINDOWS) || defined(Q_OS_WIN)
     // for Windows
+    QPainterPath path;
+    path.addRegion(r);
+    QTransform transform = QTransform::fromScale(w->devicePixelRatio(), w->devicePixelRatio());
+    QRegion scaledRegion = path.toFillPolygon(transform).toPolygon();
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
-    ::SetWindowRgn((HWND)w->winId(), QRegionToHRGN(r), true);
+    ::SetWindowRgn((HWND)w->winId(), QRegionToHRGN(scaledRegion), true);
 #else
-    ::SetWindowRgn((HWND)w->winId(), r.toHRGN(), true);
+    ::SetWindowRgn((HWND)w->winId(), scaledRegion.toHRGN(), true);
 #endif
 #elif defined(Q_OS_MACOS)
     // for macOS

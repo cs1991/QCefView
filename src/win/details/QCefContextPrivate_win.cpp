@@ -5,8 +5,10 @@
 bool
 QCefContextPrivate::initializeCef(const QCefConfig* config)
 {
+#if CEF_VERSION_MAJOR < 112
   // Enable High-DPI support on Windows 7 or newer.
   CefEnableHighDPISupport();
+#endif
 
   // Build CefSettings
   CefSettings cef_settings;
@@ -26,12 +28,13 @@ QCefContextPrivate::initializeCef(const QCefConfig* config)
   auto appDelegate = std::make_shared<CCefAppDelegate>(this, cmdArgs);
   auto bridgeObjectName = config ? config->bridgeObjectName().toStdString() : std::string();
   auto app = new CefViewBrowserApp(bridgeObjectName, appDelegate);
+
   void* sandboxInfo = nullptr;
 #if defined(CEF_USE_SANDBOX)
   // Manage the life span of the sandbox information object. This is necessary
   // for sandbox support on Windows. See cef_sandbox_win.h for complete details.
-  static CefScopedSandboxInfo scoped_sandbox;
-  sandbox_info = scoped_sandbox.sandbox_info();
+  static CefScopedSandboxInfo scopedSandbox;
+  sandboxInfo = scopedSandbox.sandbox_info();
 #endif
 
   CefMainArgs main_args(::GetModuleHandle(nullptr));

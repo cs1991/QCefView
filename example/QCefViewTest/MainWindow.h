@@ -1,6 +1,7 @@
 ﻿#ifndef QCEFVIEWTEST_H
 #define QCEFVIEWTEST_H
 
+#include <QCloseEvent>
 #include <QMainWindow>
 
 #include "ui_MainWindow.h"
@@ -23,8 +24,6 @@ protected:
   // QCefView slots
 protected slots:
 
-  void onDraggableRegionChanged(const QRegion& draggableRegion, const QRegion& nonDraggableRegion);
-
   void onInvokeMethod(int browserId, int64_t frameId, const QString& method, const QVariantList& arguments);
 
   void onQCefQueryRequest(int browserId, int64_t frameId, const QCefQuery& query);
@@ -33,7 +32,7 @@ protected slots:
 
   void onLoadingStateChanged(int browserId, bool isLoading, bool canGoBack, bool canGoForward);
 
-  void onLoadStart(int browserId, qint64 frameId, bool isMainFrame, int transition_type);
+  void onLoadStart(int browserId, qint64 frameId, bool isMainFrame, int transitionType);
 
   void onLoadEnd(int browserId, qint64 frameId, bool isMainFrame, int httpStatusCode);
 
@@ -46,6 +45,10 @@ protected slots:
 
   // ui slots
 protected slots:
+  void onBtnShowDevToolsClicked();
+
+  void onBtnReloadRightViewClicked();
+
   void onBtnRecreateRightViewClicked();
 
   void onBtnChangeColorClicked();
@@ -57,12 +60,13 @@ protected slots:
   void onBtnNewBrowserClicked();
 
 private:
+  void closeEvent(QCloseEvent* event) override;
+
+private:
   Ui::MainWindow m_ui;
 
   CefViewWidget* m_pLeftCefViewWidget = nullptr;
   CefViewWidget* m_pRightCefViewWidget = nullptr;
-  QRegion m_draggableRegion;
-  QRegion m_nonDraggableRegion;
 };
 
 #endif // QCEFVIEWTEST_H

@@ -8,3 +8,4 @@ CMakeLists.txt.user
 docs/doxygen/xml
 out
 .vs
+scripts/doxygen/xml

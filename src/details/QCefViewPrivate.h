@@ -41,7 +41,17 @@ public:
   /// <summary>
   ///
   /// </summary>
-  bool disablePopuContextMenu_ = false;
+  bool isPopup_ = false;
+
+  /// <summary>
+  ///
+  /// </summary>
+  bool disablePopupContextMenu_ = false;
+
+  /// <summary>
+  ///
+  /// </summary>
+  bool enableDragAndDrop_ = false;
 
   /// <summary>
   ///
@@ -151,9 +161,19 @@ public:
 
   // #endif
 
+  /// <summary>
+  /// The last visited URL
+  /// </summary>
+  CefString lastUrl_;
+
 #if defined(QT_DEBUG)
   QElapsedTimer paintTimer_;
 #endif
+
+  /// <summary>
+  /// The list of popup child-browsers of this browser.
+  /// </summary>
+  QSet<QCefView*> popupBrowsers_;
 
 public:
   explicit QCefViewPrivate(QCefContextPrivate* ctx,
@@ -167,6 +187,8 @@ public:
 
   void destroyCefBrowser();
 
+  void closeAllPopupBrowsers();
+
   void addLocalFolderResource(const QString& path, const QString& url, int priority = 0);
 
   void addArchiveResource(const QString& path, const QString& url, const QString& password = "", int priority = 0);
@@ -176,9 +198,15 @@ public:
   bool isOSRModeEnabled() const;
 
 protected:
-  void onCefMainBrowserCreated(CefRefPtr<CefBrowser>& browser, QWindow* window);
+  void onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* window);
 
-  void onCefPopupBrowserCreated(CefRefPtr<CefBrowser>& browser, QWindow* window);
+  void onBeforeCefPopupCreate(const CefRefPtr<CefBrowser>& browser,
+                              int64_t frameId,
+                              const std::string& targetUrl,
+                              const std::string& targetFrameName,
+                              CefLifeSpanHandler::WindowOpenDisposition targetDisposition,
+                              const CefWindowInfo& windowInfo,
+                              const CefBrowserSettings& settings);
 
   void onNewDownloadItem(QSharedPointer<QCefDownloadItem> item, const QString& suggestedName);
 
@@ -191,6 +219,8 @@ protected:
                        const std::string& failedUrl);
 
 public slots:
+  void onPopupBrowserDestroyed(QObject* popup);
+
   void onAppFocusChanged(QWidget* old, QWidget* now);
 
   void onViewScreenChanged(QScreen* screen);
@@ -229,8 +259,14 @@ protected:
   void onCefContextMenuDismissed();
   // #endif
 
+  bool hasDevTools();
+
+  void showDevTools();
+
+  void closeDevTools();
+
 protected:
-  virtual bool eventFilter(QObject* watched, QEvent* event) override;
+  bool eventFilter(QObject* watched, QEvent* event) override;
 
   QVariant onViewInputMethodQuery(Qt::InputMethodQuery query) const;
 
@@ -250,6 +286,8 @@ protected:
 
 public:
   int browserId();
+
+  bool isPopup();
 
   void navigateToString(const QString& content);
 

@@ -65,6 +65,15 @@ mapCursorShape(cef_cursor_type_t& type)
   return sCursorTable[type];
 }
 
+bool
+CCefClientDelegate::onDragEnter(CefRefPtr<CefBrowser> browser,
+                                CefRefPtr<CefDragData> dragData,
+                                CefDragHandler::DragOperationsMask mask)
+{
+  // Return false for default drag handling behavior or true to cancel the drag event.
+  return !pCefViewPrivate_->q_ptr->isDragAndDropEnabled();
+}
+
 void
 CCefClientDelegate::draggableRegionChanged(CefRefPtr<CefBrowser>& browser,
                                            const std::vector<CefDraggableRegion>& regions)

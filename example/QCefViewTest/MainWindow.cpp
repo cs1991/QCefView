@@ -29,7 +29,9 @@ MainWindow::MainWindow(QWidget* parent)
   // setWindowFlags(Qt::FramelessWindowHint);
   // setAttribute(Qt::WA_TranslucentBackground);
 
-  connect(m_ui.btn_reCreate, &QPushButton::clicked, this, &MainWindow::onBtnRecreateRightViewClicked);
+  connect(m_ui.btn_showDevTools, &QPushButton::clicked, this, &MainWindow::onBtnShowDevToolsClicked);
+  connect(m_ui.btn_reloadRight, &QPushButton::clicked, this, &MainWindow::onBtnReloadRightViewClicked);
+  connect(m_ui.btn_recreateRight, &QPushButton::clicked, this, &MainWindow::onBtnRecreateRightViewClicked);
   connect(m_ui.btn_changeColor, &QPushButton::clicked, this, &MainWindow::onBtnChangeColorClicked);
   connect(m_ui.btn_setFocus, &QPushButton::clicked, this, &MainWindow::onBtnSetFocusClicked);
   connect(m_ui.btn_callJSCode, &QPushButton::clicked, this, &MainWindow::onBtnCallJSCodeClicked);
@@ -67,11 +69,7 @@ MainWindow::createLeftCefView()
 
   // connect the cefQueryRequest to the slot
   connect(m_pLeftCefViewWidget, &QCefView::cefQueryRequest, this, &MainWindow::onQCefQueryRequest);
-
-  connect(m_pLeftCefViewWidget, &QCefView::draggableRegionChanged, this, &MainWindow::onDraggableRegionChanged);
-
   connect(m_pLeftCefViewWidget, &QCefView::reportJavascriptResult, this, &MainWindow::onJavascriptResult);
-
   connect(m_pLeftCefViewWidget, &QCefView::loadStart, this, &MainWindow::onLoadStart);
   connect(m_pLeftCefViewWidget, &QCefView::loadEnd, this, &MainWindow::onLoadEnd);
   connect(m_pLeftCefViewWidget, &QCefView::loadError, this, &MainWindow::onLoadError);
@@ -100,10 +98,11 @@ MainWindow::createRightCefView()
   // setting.setBackgroundColor(Qt::blue);
 
   // create the QCefView widget and add it to the layout container
-  m_pRightCefViewWidget = new CefViewWidget("https://www.thinkbroadband.com/download", &setting);
+  // m_pRightCefViewWidget = new CefViewWidget("https://cefview.github.io/QCefView/", &setting, this);
 
   // this site is for test web events
-  // m_pRightCefViewWidget = new CefViewWidget("http://xcal1.vodafone.co.uk/", &setting, this);
+  m_pRightCefViewWidget = new CefViewWidget("", &setting, this);
+  m_pRightCefViewWidget->navigateToUrl("https://fastest.fish/test-files");
 
   //
   // m_pRightCefViewWidget = new CefViewWidget("https://mdn.dev/", &setting, this);
@@ -112,7 +111,7 @@ MainWindow::createRightCefView()
   // m_pRightCefViewWidget = new CefViewWidget("https://www.testufo.com", &setting, this);
 
   // this site is test for input devices
-  m_pRightCefViewWidget = new CefViewWidget("https://devicetests.com", &setting);
+  // m_pRightCefViewWidget = new CefViewWidget("https://devicetests.com", &setting);
 
   m_ui.rightCefViewContainer->layout()->addWidget(m_pRightCefViewWidget);
 
@@ -126,13 +125,6 @@ MainWindow::createRightCefView()
   // m_pRightCefViewWidget->setContextMenuPolicy(Qt::PreventContextMenu);
 
   //*/
-}
-
-void
-MainWindow::onDraggableRegionChanged(const QRegion& draggableRegion, const QRegion& nonDraggableRegion)
-{
-  m_draggableRegion = draggableRegion;
-  m_nonDraggableRegion = nonDraggableRegion;
 }
 
 void
@@ -203,10 +195,10 @@ MainWindow::onLoadingStateChanged(int browserId, bool isLoading, bool canGoBack,
 }
 
 void
-MainWindow::onLoadStart(int browserId, qint64 frameId, bool isMainFrame, int transition_type)
+MainWindow::onLoadStart(int browserId, qint64 frameId, bool isMainFrame, int transitionType)
 {
   qDebug() << "onLoadStart, browserId:" << browserId << ", frameId:" << frameId << ", isMainFrame:" << isMainFrame
-           << ", transitionType:" << transition_type;
+           << ", transitionType:" << transitionType;
 }
 
 void
@@ -226,6 +218,22 @@ MainWindow::onLoadError(int browserId,
 {
   qDebug() << "onLoadError, browserId:" << browserId << ", frameId:" << frameId << ", isMainFrame:" << isMainFrame
            << ", errorCode:" << errorCode;
+}
+
+void
+MainWindow::onBtnShowDevToolsClicked()
+{
+  if (m_pLeftCefViewWidget) {
+    m_pLeftCefViewWidget->showDevTools();
+  }
+}
+
+void
+MainWindow::onBtnReloadRightViewClicked()
+{
+  if (m_pRightCefViewWidget) {
+    m_pRightCefViewWidget->navigateToUrl("https://www.google.com");
+  }
 }
 
 void
@@ -278,6 +286,22 @@ MainWindow::onBtnNewBrowserClicked()
   w->setCentralWidget(view);
   w->resize(1024, 768);
   w->show();
+}
+
+void
+MainWindow::closeEvent(QCloseEvent* event)
+{
+  if (m_pLeftCefViewWidget) {
+    m_pLeftCefViewWidget->deleteLater();
+    m_pLeftCefViewWidget = nullptr;
+  }
+
+  if (m_pRightCefViewWidget) {
+    m_pRightCefViewWidget->deleteLater();
+    m_pRightCefViewWidget = nullptr;
+  }
+
+  event->accept();
 }
 
 #ifndef Q_OS_MACOS

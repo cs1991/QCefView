@@ -68,13 +68,18 @@ public:
   /// <param name="url">The target url</param>
   /// <param name="setting">The <see cref="QCefSetting"/> instance</param>
   /// <param name="parent">The parent</param>
-  QCefView(const QString url, const QCefSetting* setting, QWidget* parent = 0);
+  /// <param name="f">The Qt WindowFlags</param>
+  QCefView(const QString url,
+           const QCefSetting* setting,
+           QWidget* parent = nullptr,
+           Qt::WindowFlags f = Qt::WindowFlags());
 
   /// <summary>
   /// Constructs a QCefView instance
   /// </summary>
   /// <param name="parent">The parent</param>
-  QCefView(QWidget* parent = 0);
+  /// <param name="f">The Qt WindowFlags</param>
+  QCefView(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags());
 
   /// <summary>
   /// Destructs the QCefView instance
@@ -103,6 +108,12 @@ public:
   /// </summary>
   /// <returns>The browser id</returns>
   int browserId();
+
+  /// <summary>
+  /// Gets whether the browser is created as popup browser
+  /// </summary>
+  /// <returns>True if it is popup browser; otherwise false</returns>
+  bool isPopup();
 
   /// <summary>
   /// Navigates to the content.
@@ -219,7 +230,7 @@ public:
   /// preference will be restored to default value
   /// </param>
   /// <param name="error">The error message populated on failure</param>
-  // <returns>True on successful; otherwise false</returns>
+  /// <returns>True on successful; otherwise false</returns>
   bool setPreference(const QString& name, const QVariant& value, const QString& error);
 
   /// <summary>
@@ -233,6 +244,38 @@ public:
   /// </summary>
   /// <returns>True to disable; otherwise false</returns>
   bool isPopupContextMenuDisabled();
+
+  /// <summary>
+  /// Detects whether this browser has a devtools opened
+  /// </summary>
+  /// <returns>True if opend already; otherwise false</returns>
+  bool hasDevTools();
+
+  /// <summary>
+  /// Opens the devtools dialog
+  /// </summary>
+  void showDevTools();
+
+  /// <summary>
+  /// Closes the devtools dialog
+  /// </summary>
+  void closeDevTools();
+
+  /// <summary>
+  /// Sets whether to enable drag and drop
+  /// </summary>
+  /// <param name="enable">True to enable; otherwise false</param>
+  /// <remarks>
+  /// This function does not work for OSR mode. There is a problem, when dragging a file to a non dragging area,
+  /// the content of the file will be displayed. You need to solve the problem yourself.
+  /// </remarks>
+  void setEnableDragAndDrop(bool enable);
+
+  /// <summary>
+  /// Gets whether to enable drag and drop
+  /// </summary>
+  /// <returns>True to enable; otherwise false</returns>
+  bool isDragAndDropEnabled() const;
 
 signals:
   // alt+Q，退出键盘事件
@@ -256,8 +299,8 @@ signals:
   /// <param name="browserId">Indicates the browser id</param>
   /// <param name="frameId">Indicates the frame id</param>
   /// <param name="isMainFrame">Indicates the whether this is the main frame</param>
-  /// <param name="transition_type">transition type</param>
-  void loadStart(int browserId, qint64 frameId, bool isMainFrame, int transition_type);
+  /// <param name="transitionType">transition type</param>
+  void loadStart(int browserId, qint64 frameId, bool isMainFrame, int transitionType);
 
   /// <summary>
   /// Gets called on loading ends
@@ -305,13 +348,13 @@ signals:
   void titleChanged(const QString& title);
 
   /// <summary>
-  /// Gets called on title changed
+  /// Gets called on favicon url changed
   /// </summary>
   /// <param name="urls">The urls</param>
   void faviconURLChanged(const QStringList& urls);
 
   /// <summary>
-  /// Gets called on title changed
+  /// Gets called on favicon changed
   /// </summary>
   /// <param name="icon">The icon</param>
   void faviconChanged(const QIcon& icon);
@@ -367,13 +410,30 @@ signals:
   /// <param name="result">The result</param>
   void reportJavascriptResult(int browserId, qint64 frameId, qint64 context, const QVariant& result);
 
-public slots:
   /// <summary>
-  /// Gets called after the main browser window created. This slot does not work for OSR mode.
+  /// Gets called after the native browser window created. This slot does not work for OSR mode.
   /// </summary>
-  /// <param name="win">The CEF window</param>
-  virtual void onBrowserWindowCreated(QWindow* win);
+  /// <param name="window">The native browser windows</param>
+  void nativeBrowserCreated(QWindow* window);
 
+  /// <summary>
+  /// Gets called right after the popup browser was created.
+  /// </summary>
+  /// <param name="popup">The new created popup QCefView instance</param>
+  /// <remarks>
+  /// The lifecycle of the popup browser is managed by the owner of the popup browser,
+  /// thus do not try to hold the popup browser instance.
+  /// If you need to implement browser tab, you should override the <see cref="onBeforePopup"/> method
+  /// and create your own QCefView browser instance then you can manipulate the created one as whatever
+  /// you want.
+  /// </remarks>
+  void popupCreated(QCefView* popup);
+
+protected:
+	  /// 打开和关闭devtools
+  /// </summary>
+  void onShowDevtools();
+  void closeDevtools();
   /// <summary>
   /// Gets called before the popup browser created
   /// </summary>
@@ -381,27 +441,15 @@ public slots:
   /// <param name="targetUrl">The target URL</param>
   /// <param name="targetFrameName">The target name</param>
   /// <param name="targetDisposition">Target window open method</param>
+  /// <param name="rect">Rect to be used for the popup</param>
   /// <param name="settings">Settings to be used for the popup</param>
-  /// <param name="DisableJavascriptAccess">Disable the access to Javascript</param>
   /// <returns>True to cancel the popup; false to allow</returns>
   virtual bool onBeforePopup(qint64 frameId,
                              const QString& targetUrl,
                              const QString& targetFrameName,
                              QCefView::CefWindowOpenDisposition targetDisposition,
-                             QCefSetting& settings,
-                             bool& DisableJavascriptAccess);
-  /// <summary>
-  /// 打开和关闭devtools
-  /// </summary>
-  void onShowDevtools();
-  void closeDevtools();
-
-protected:
-  /// <summary>
-  /// Gets called right after the popup browser was created
-  /// </summary>
-  /// <param name="wnd">The host window of new created browser</param>
-  virtual void onPopupCreated(QWindow* wnd);
+                             QRect& rect,
+                             QCefSetting& settings);
 
   /// <summary>
   /// Gets called on new download item was required. Keep reference to the download item
@@ -409,7 +457,7 @@ protected:
   /// Ignore the download item to disallow the download
   /// </summary>
   /// <param name="item">The new download item</param>
-  /// <param name="suggestedName">The nesuggested name</param>
+  /// <param name="suggestedName">The new suggested name</param>
   virtual void onNewDownloadItem(const QSharedPointer<QCefDownloadItem>& item, const QString& suggestedName);
 
   /// <summary>
@@ -424,10 +472,7 @@ public slots:
   /// <summary>
   ///
   /// </summary>
-  inline void setFocus()
-  {
-    setFocus(Qt::OtherFocusReason);
-  }
+  inline void setFocus() { setFocus(Qt::OtherFocusReason); }
 
 public:
   /// <summary>
