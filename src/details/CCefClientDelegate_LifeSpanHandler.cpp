@@ -90,7 +90,7 @@ CCefClientDelegate::doClose(CefRefPtr<CefBrowser> browser)
 }
 
 void
-CCefClientDelegate::OnBeforeClose(CefRefPtr<CefBrowser> browser)
+CCefClientDelegate::onBeforeClose(CefRefPtr<CefBrowser> browser)
 {
   return;
 }
