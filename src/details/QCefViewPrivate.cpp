@@ -262,20 +262,7 @@ QCefViewPrivate::onBeforeNewBrowserCreate(qint64 sourceFrameId,
 {
   Q_Q(QCefView);
 
-  auto url = QString::fromStdString(targetUrl);
-  auto name = QString::fromStdString(targetFrameName);
-  auto d = (QCefView::CefWindowOpenDisposition)targetDisposition;
-
-#if CEF_VERSION_MAJOR > 91
-  auto rc = QRect(windowInfo.bounds.x, windowInfo.bounds.y, windowInfo.bounds.width, windowInfo.bounds.height);
-#else
-  auto rc = QRect(windowInfo.x, windowInfo.y, windowInfo.width, windowInfo.height);
-#endif
   
-  if (rc.width() <= 0) {
-    rc.setWidth(DEFAULT_POPUP_WIDTH);
-  }
-
   // this is a fake pop-up browser, we just cancel it and then
   // we create a new QCefView instance to replace the fake pop-up browser
   q->onNewBrowser(sourceFrameId,     //
@@ -646,8 +633,8 @@ QCefViewPrivate::onFileDialog(CefBrowserHost::FileDialogMode mode,
   }
 
   // set accepted file types
+  QStringList filters;
   if (!accept_filters.empty()) {
-    QStringList filters;
     for (const auto& filter : accept_filters) {
       filters << "*" + QString::fromStdString(filter.ToString());
     }
@@ -661,7 +648,12 @@ QCefViewPrivate::onFileDialog(CefBrowserHost::FileDialogMode mode,
     for (const auto& file : selected_files) {
       file_paths.push_back(file.toStdString());
     }
+    int selectedFilterIndex = filters.indexOf(dialog.selectedNameFilter());
+#if CEF_VERSION_MAJOR > 91
     callback->Continue(file_paths);
+#else
+    callback->Continue(selectedFilterIndex, file_paths);
+#endif
   } else {
     callback->Cancel();
   }

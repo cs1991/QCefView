@@ -8,7 +8,7 @@
 int
 main(int argc, char* argv[])
 {
-#if (QT_VERSION <= QT_VERSION_CHECK(6, 0, 0))
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   // For off-screen rendering, Qt::AA_EnableHighDpiScaling must be enabled. If not,
   // then all devicePixelRatio methods will always return 1.0,
   // so CEF will not scale the web content
