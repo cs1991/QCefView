@@ -16,19 +16,19 @@
 #include "details/utils/CommonUtils.h"
 #include "QCefDevtoolsView.h"
 
-QCefView::QCefView(const QString url,
+QCefView::QCefView(const QString& url,
                    const QCefSetting* setting,
                    QWidget* parent /*= 0*/,
                    Qt::WindowFlags f /*= Qt::WindowFlags()*/)
   : QWidget(parent, f)
   , d_ptr(new QCefViewPrivate(QCefContext::instance()->d_func(), this, url, setting))
 {
-  // #if defined(CEF_USE_OSR)
+
   if (d_ptr->isOSRModeEnabled()) {
+    // OSR mode
     setBackgroundRole(QPalette::Window);
     setAttribute(Qt::WA_OpaquePaintEvent);
   }
-  // #endif
 
   setMouseTracking(true);
   setFocusPolicy(Qt::WheelFocus);
@@ -51,9 +51,6 @@ QCefView::~QCefView()
     dev_ptr.reset();
   }
   if (d_ptr) {
-    // close all popup browsers
-    d_ptr->closeAllPopupBrowsers();
-
     // destroy under layer cef browser
     d_ptr->destroyCefBrowser();
     d_ptr.reset();
@@ -107,14 +104,6 @@ QCefView::browserId()
   Q_D(QCefView);
 
   return d->browserId();
-}
-
-bool
-QCefView::isPopup()
-{
-  Q_D(QCefView);
-
-  return d->isPopup();
 }
 
 void
@@ -230,7 +219,7 @@ QCefView::executeJavascript(qint64 frameId, const QString& code, const QString& 
 }
 
 bool
-QCefView::executeJavascriptWithResult(qint64 frameId, const QString& code, const QString& url, qint64 context)
+QCefView::executeJavascriptWithResult(qint64 frameId, const QString& code, const QString& url, const QString& context)
 {
   Q_D(QCefView);
 
@@ -309,13 +298,39 @@ QCefView::setFocus(Qt::FocusReason reason)
   d->setCefWindowFocus(true);
 }
 
+QCefView*
+QCefView::onNewBrowser(qint64 sourceFrameId,
+                       const QString& url,
+                       const QString& name,
+                       CefWindowOpenDisposition targetDisposition,
+                       QRect& rect,
+                       QCefSetting& settings)
+{
+  QCefView* popup = new QCefView(url, &settings, nullptr, Qt::WindowFlags());
+  if (!popup) {
+    // failed to create QCefView, cancel popup
+    return nullptr;
+  }
+
+  // config the popup QCefView
+  if (!name.isEmpty()) {
+    popup->setWindowTitle(name);
+  }
+  popup->setAttribute(Qt::WA_DeleteOnClose, true);
+  popup->resize(rect.size());
+  popup->show();
+
+  return popup;
+}
+
 bool
-QCefView::onBeforePopup(qint64 frameId,
-                        const QString& targetUrl,
-                        const QString& targetFrameName,
-                        QCefView::CefWindowOpenDisposition targetDisposition,
-                        QRect& rect,
-                        QCefSetting& settings)
+QCefView::onNewPopup(qint64 frameId,
+                     const QString& targetUrl,
+                     QString& targetFrameName,
+                     QCefView::CefWindowOpenDisposition targetDisposition,
+                     QRect& rect,
+                     QCefSetting& settings,
+                     bool& disableJavascriptAccess)
 {
   return false;
 }
@@ -330,43 +345,43 @@ QCefView::onUpdateDownloadItem(const QSharedPointer<QCefDownloadItem>& item)
 {
 }
 
+bool
+QCefView::onRequestCloseFromWeb()
+{
+  // delete self
+  deleteLater();
+
+  return true;
+}
+
 QVariant
 QCefView::inputMethodQuery(Qt::InputMethodQuery query) const
 {
   Q_D(const QCefView);
 
-  // #if defined(CEF_USE_OSR)
   if (d->isOSRModeEnabled()) {
+    // OSR mode
     auto r = d->onViewInputMethodQuery(query);
     if (r.isValid())
       return r;
   }
-  // #endif
 
   return QWidget::inputMethodQuery(query);
 }
 
 void
-QCefView::paintEvent(QPaintEvent* event)
+QCefView::render(QPainter* painter)
 {
   Q_D(QCefView);
 
-  // 1. construct painter for current widget
-  QPainter painter(this);
-
-  // 2. paint background with background role
-  // for OSR mode, this makes sure the surface will be cleared before a new drawing
-  // for NCW mode, this makes sure QCefView will not be treated as transparent background
-  painter.fillRect(rect(), palette().color(backgroundRole()));
-
-  // #if defined(CEF_USE_OSR)
   if (d->isOSRModeEnabled()) {
-    // 3. paint widget with its stylesheet
+    // OSR mode
+    // 1. paint widget with its stylesheet
     QStyleOption opt;
     opt.initFrom(this);
-    style()->drawPrimitive(QStyle::PE_Widget, &opt, &painter, this);
+    style()->drawPrimitive(QStyle::PE_Widget, &opt, painter, this);
 
-    // 4. paint the CEF view and popup
+    // 2. paint the CEF view and popup
     // get current scale factor
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
     qreal scaleFactor = devicePixelRatioF();
@@ -380,19 +395,33 @@ QCefView::paintEvent(QPaintEvent* event)
       QMutexLocker lock(&(d->osr.qViewPaintLock_));
       int width = d->osr.qCefViewFrame_.width() / scaleFactor;
       int height = d->osr.qCefViewFrame_.height() / scaleFactor;
-      painter.drawImage(QRect{ 0, 0, width, height }, d->osr.qCefViewFrame_);
+      painter->drawImage(QRect{ 0, 0, width, height }, d->osr.qCefViewFrame_);
     }
     {
       // paint cef popup
       QMutexLocker lock(&(d->osr.qPopupPaintLock_));
       if (d->osr.showPopup_) {
-        painter.drawImage(d->osr.qPopupRect_, d->osr.qCefPopupFrame_);
+        painter->drawImage(d->osr.qPopupRect_, d->osr.qCefPopupFrame_);
       }
     }
   }
-  // #endif
+}
 
-  // 5. call base paintEvent (empty implementation)
+void
+QCefView::paintEvent(QPaintEvent* event)
+{
+  // 1. construct painter for current widget
+  QPainter painter(this);
+
+  // 2. paint background with background role
+  // for OSR mode, this makes sure the surface will be cleared before a new drawing
+  // for NCW mode, this makes sure QCefView will not be treated as transparent background
+  painter.fillRect(rect(), palette().color(backgroundRole()));
+
+  // 3. render self
+  render(&painter);
+
+  // 4. call base paintEvent (empty implementation)
   QWidget::paintEvent(event);
 }
 
@@ -498,11 +527,10 @@ QCefView::contextMenuEvent(QContextMenuEvent* event)
 
   Q_D(const QCefView);
 
-  // #if defined(CEF_USE_OSR)
   if (d->isOSRModeEnabled()) {
+    // OSR mode
     if (d->osr.isShowingContextMenu_) {
       d->osr.contextMenu_->popup(mapToGlobal(event->pos()));
     }
   }
-  // #endif
 }

@@ -69,7 +69,7 @@ public:
   /// <param name="setting">The <see cref="QCefSetting"/> instance</param>
   /// <param name="parent">The parent</param>
   /// <param name="f">The Qt WindowFlags</param>
-  QCefView(const QString url,
+  QCefView(const QString& url,
            const QCefSetting* setting,
            QWidget* parent = nullptr,
            Qt::WindowFlags f = Qt::WindowFlags());
@@ -108,12 +108,6 @@ public:
   /// </summary>
   /// <returns>The browser id</returns>
   int browserId();
-
-  /// <summary>
-  /// Gets whether the browser is created as popup browser
-  /// </summary>
-  /// <returns>True if it is popup browser; otherwise false</returns>
-  bool isPopup();
 
   /// <summary>
   /// Navigates to the content.
@@ -219,7 +213,7 @@ public:
   /// </param>
   /// <param name="context">The context used to identify the one execution</param>
   /// <returns>True on successful; otherwise false</returns>
-  bool executeJavascriptWithResult(qint64 frameId, const QString& code, const QString& url, qint64 context);
+  bool executeJavascriptWithResult(qint64 frameId, const QString& code, const QString& url, const QString& context);
 
   /// <summary>
   /// Sets the preference for this browser
@@ -354,12 +348,6 @@ signals:
   void faviconURLChanged(const QStringList& urls);
 
   /// <summary>
-  /// Gets called on favicon changed
-  /// </summary>
-  /// <param name="icon">The icon</param>
-  void faviconChanged(const QIcon& icon);
-
-  /// <summary>
   /// Gets called on fullscreen mode changed
   /// </summary>
   /// <param name="fullscreen">The current fullscreen mode</param>
@@ -408,7 +396,7 @@ signals:
   /// <param name="frameId">The frame id</param>
   /// <param name="context">The context</param>
   /// <param name="result">The result</param>
-  void reportJavascriptResult(int browserId, qint64 frameId, qint64 context, const QVariant& result);
+  void reportJavascriptResult(int browserId, qint64 frameId, const QString& context, const QVariant& result);
 
   /// <summary>
   /// Gets called after the native browser window created. This slot does not work for OSR mode.
@@ -416,26 +404,31 @@ signals:
   /// <param name="window">The native browser windows</param>
   void nativeBrowserCreated(QWindow* window);
 
-  /// <summary>
-  /// Gets called right after the popup browser was created.
-  /// </summary>
-  /// <param name="popup">The new created popup QCefView instance</param>
-  /// <remarks>
-  /// The lifecycle of the popup browser is managed by the owner of the popup browser,
-  /// thus do not try to hold the popup browser instance.
-  /// If you need to implement browser tab, you should override the <see cref="onBeforePopup"/> method
-  /// and create your own QCefView browser instance then you can manipulate the created one as whatever
-  /// you want.
-  /// </remarks>
-  void popupCreated(QCefView* popup);
-
 protected:
 	  /// 打开和关闭devtools
   /// </summary>
   void onShowDevtools();
   void closeDevtools();
   /// <summary>
-  /// Gets called before the popup browser created
+  /// Gets called before a new browser created (only for browser created by non-JavaScript)
+  /// </summary>
+  /// <param name="frameId">The source frame id</param>
+  /// <param name="url">The target URL</param>
+  /// <param name="name">The target name</param>
+  /// <param name="targetDisposition">Target window open method</param>
+  /// <param name="rect">Rect to be used for the popup</param>
+  /// <param name="settings">Settings to be used for the popup</param>
+  /// <returns>True to cancel the popup; false to allow</returns>
+  /// <returns></returns>
+  virtual QCefView* onNewBrowser(qint64 sourceFrameId,
+                                 const QString& url,
+                                 const QString& name,
+                                 QCefView::CefWindowOpenDisposition targetDisposition,
+                                 QRect& rect,
+                                 QCefSetting& settings);
+
+  /// <summary>
+  /// Gets called before the popup browser created (only for browser created by JavaScript)
   /// </summary>
   /// <param name="frameId">The source frame id</param>
   /// <param name="targetUrl">The target URL</param>
@@ -444,12 +437,13 @@ protected:
   /// <param name="rect">Rect to be used for the popup</param>
   /// <param name="settings">Settings to be used for the popup</param>
   /// <returns>True to cancel the popup; false to allow</returns>
-  virtual bool onBeforePopup(qint64 frameId,
-                             const QString& targetUrl,
-                             const QString& targetFrameName,
-                             QCefView::CefWindowOpenDisposition targetDisposition,
-                             QRect& rect,
-                             QCefSetting& settings);
+  virtual bool onNewPopup(qint64 frameId,
+                          const QString& targetUrl,
+                          QString& targetFrameName,
+                          QCefView::CefWindowOpenDisposition targetDisposition,
+                          QRect& rect,
+                          QCefSetting& settings,
+                          bool& disableJavascriptAccess);
 
   /// <summary>
   /// Gets called on new download item was required. Keep reference to the download item
@@ -466,6 +460,12 @@ protected:
   /// </summary>
   /// <param name="item">The download item</param>
   virtual void onUpdateDownloadItem(const QSharedPointer<QCefDownloadItem>& item);
+
+  /// <summary>
+  /// Gets called on close request from web
+  /// </summary>
+  /// <returns>True to allow the close, false to cancel the close</returns>
+  virtual bool onRequestCloseFromWeb();
 
 #pragma region QWidget
 public slots:
@@ -484,6 +484,12 @@ public:
   /// Please refer to QWidget::inputMethodQuery
   /// </summary>
   QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
+
+  /// <summary>
+  /// Renders the view content to target painter
+  /// </summary>
+  /// <param name="painter">The target painter</param>
+  void render(QPainter* painter);
 
 protected:
   /// <summary>

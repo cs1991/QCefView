@@ -3,9 +3,7 @@
 #include <QMenu>
 #include <QMutex>
 #include <QPointer>
-#include <QSet>
 #include <QString>
-#include <QWindow>
 
 #if defined(QT_DEBUG)
 #include <QElapsedTimer>
@@ -17,6 +15,7 @@
 
 #include "CCefClientDelegate.h"
 #include "QCefContextPrivate.h"
+#include "QCefWindow.h"
 #include "utils/MenuBuilder.h"
 
 #include <QCefView.h>
@@ -37,11 +36,6 @@ public:
   ///
   /// </summary>
   static void destroyAllInstance();
-
-  /// <summary>
-  ///
-  /// </summary>
-  bool isPopup_ = false;
 
   /// <summary>
   ///
@@ -77,8 +71,6 @@ public:
   ///
   /// </summary>
   bool isOSRModeEnabled_ = false;
-
-  // #if defined(CEF_USE_OSR)
 
   /// <summary>
   /// Offscreen rendering private data
@@ -141,8 +133,6 @@ public:
     CefRefPtr<CefRunContextMenuCallback> contextMenuCallback_;
   } osr;
 
-  // #else
-
   /// <summary>
   /// Native child window private data
   /// </summary>
@@ -151,15 +141,13 @@ public:
     /// <summary>
     ///
     /// </summary>
-    QWindow* qBrowserWindow_ = nullptr;
+    QCefWindow* qBrowserWindow_ = nullptr;
 
     /// <summary>
     ///
     /// </summary>
     QWidget* qBrowserWidget_ = nullptr;
   } ncw;
-
-  // #endif
 
   /// <summary>
   /// The last visited URL
@@ -170,11 +158,6 @@ public:
   QElapsedTimer paintTimer_;
 #endif
 
-  /// <summary>
-  /// The list of popup child-browsers of this browser.
-  /// </summary>
-  QSet<QCefView*> popupBrowsers_;
-
 public:
   explicit QCefViewPrivate(QCefContextPrivate* ctx,
                            QCefView* view,
@@ -183,11 +166,9 @@ public:
 
   ~QCefViewPrivate();
 
-  void createCefBrowser(QCefView* view, const QString url, const QCefSetting* setting);
+  void createCefBrowser(QCefView* view, const QString& url, const QCefSetting* setting);
 
   void destroyCefBrowser();
-
-  void closeAllPopupBrowsers();
 
   void addLocalFolderResource(const QString& path, const QString& url, int priority = 0);
 
@@ -200,13 +181,22 @@ public:
 protected:
   void onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* window);
 
-  void onBeforeCefPopupCreate(const CefRefPtr<CefBrowser>& browser,
-                              int64_t frameId,
-                              const std::string& targetUrl,
-                              const std::string& targetFrameName,
-                              CefLifeSpanHandler::WindowOpenDisposition targetDisposition,
-                              const CefWindowInfo& windowInfo,
-                              const CefBrowserSettings& settings);
+  bool onBeforeNewBrowserCreate(qint64 sourceFrameId,
+                                const QString& targetUrl,
+                                const QString& targetFrameName,
+                                QCefView::CefWindowOpenDisposition targetDisposition,
+                                QRect rect,
+                                QCefSetting settings);
+
+  bool onBeforeNewPopupCreate(qint64 sourceFrameId,
+                              const QString& targetUrl,
+                              QString& targetFrameName,
+                              QCefView::CefWindowOpenDisposition targetDisposition,
+                              QRect& rect,
+                              QCefSetting& settings,
+                              bool& disableJavascriptAccess);
+
+  void onAfterCefPopupCreated(CefRefPtr<CefBrowser> browser);
 
   void onNewDownloadItem(QSharedPointer<QCefDownloadItem> item, const QString& suggestedName);
 
@@ -218,9 +208,9 @@ protected:
                        const std::string& errorMsg,
                        const std::string& failedUrl);
 
-public slots:
-  void onPopupBrowserDestroyed(QObject* popup);
+  bool requestCloseFromWeb(CefRefPtr<CefBrowser>& browser);
 
+public slots:
   void onAppFocusChanged(QWidget* old, QWidget* now);
 
   void onViewScreenChanged(QScreen* screen);
@@ -233,7 +223,6 @@ public slots:
 
   void onCefInputStateChanged(bool editable);
 
-  // #if defined(CEF_USE_OSR)
   void onOsrImeCursorRectChanged(const QRect& rc);
 
   void onOsrShowPopup(bool show);
@@ -257,7 +246,12 @@ protected:
   void onRunCefContextMenu(QPoint pos, CefRefPtr<CefRunContextMenuCallback> callback);
 
   void onCefContextMenuDismissed();
-  // #endif
+
+  void onFileDialog(CefBrowserHost::FileDialogMode mode,
+                    const CefString& title,
+                    const CefString& default_file_path,
+                    const std::vector<CefString>& accept_filters,
+                    CefRefPtr<CefFileDialogCallback> callback);
 
   bool hasDevTools();
 
@@ -287,8 +281,6 @@ protected:
 public:
   int browserId();
 
-  bool isPopup();
-
   void navigateToString(const QString& content);
 
   void navigateToUrl(const QString& url);
@@ -313,7 +305,7 @@ public:
 
   bool executeJavascript(int64_t frameId, const QString& code, const QString& url);
 
-  bool executeJavascriptWithResult(int64_t frameId, const QString& code, const QString& url, int64_t context);
+  bool executeJavascriptWithResult(int64_t frameId, const QString& code, const QString& url, const QString& context);
 
   void notifyMoveOrResizeStarted();
 

@@ -1,4 +1,5 @@
 ﻿#include <QApplication>
+#include <QDir>
 
 #include <QCefContext.h>
 
@@ -7,6 +8,15 @@
 int
 main(int argc, char* argv[])
 {
+#if (QT_VERSION <= QT_VERSION_CHECK(6, 0, 0))
+  // For off-screen rendering, Qt::AA_EnableHighDpiScaling must be enabled. If not,
+  // then all devicePixelRatio methods will always return 1.0,
+  // so CEF will not scale the web content
+  // NOET: There is bugs in Qt 6.2.4, the HighDpi doesn't work 
+  QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
+  QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
+#endif
+
   // create QApplication instance
   QApplication a(argc, argv);
 
@@ -41,6 +51,11 @@ main(int argc, char* argv[])
   config.addCommandLineSwitchWithValue("remote-allow-origins", "*");
   // config.addCommandLineSwitchWithValue("disable-features", "BlinkGenPropertyTrees,TranslateUI,site-per-process");
 
+#if defined(Q_OS_MACOS) && defined(QT_DEBUG)
+  // cef bugs on macOS debug build
+  config.setCachePath(QDir::tempPath());
+#endif
+  
   // create QCefContext instance with config,
   // the lifecycle of cefContext must be the same as QApplication instance
   QCefContext cefContext(&a, argc, argv, &config);
@@ -52,4 +67,3 @@ main(int argc, char* argv[])
   // flying
   return a.exec();
 }
-

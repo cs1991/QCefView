@@ -36,6 +36,10 @@ source_group(
   FILES ${QCefView_details_SRC_FILES}
 )
 
+if(USE_SANDBOX AND(OS_WINDOWS OR OS_MACOS))
+  add_definitions(-DCEF_USE_SANDBOX)
+endif()
+
 if(OS_WINDOWS)
   file(GLOB_RECURSE QCefView_Windows_SRC_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/win/*.h"
@@ -66,7 +70,7 @@ if(OS_WINDOWS)
     # copy binary files of CefViewCore
     COMMAND ${CMAKE_COMMAND}
     -E copy_directory
-    "$<TARGET_FILE_DIR:CefViewWing>"
+    "$<TARGET_FILE_DIR:${CEFVIEW_WING_NAME}>"
     "$<TARGET_FILE_DIR:QCefView>"
 
     # gnerate a file contains timestamp
@@ -104,11 +108,6 @@ if(OS_LINUX)
     PROPERTIES
     INSTALL_RPATH "$ORIGIN"
     BUILD_WITH_INSTALL_RPATH TRUE
-  )
-
-  target_link_libraries(QCefView
-    PRIVATE
-    Qt${QT_VERSION_MAJOR}::GuiPrivate
   )
 
   add_custom_command(TARGET QCefView
