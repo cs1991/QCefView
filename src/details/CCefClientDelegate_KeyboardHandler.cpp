@@ -4,6 +4,12 @@
 
 #include "QCefViewPrivate.h"
 
+#ifdef Q_OS_LINUX
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#endif
+
 bool
 CCefClientDelegate::onPreKeyEvent(CefRefPtr<CefBrowser> browser,
                                   const CefKeyEvent& event,
@@ -88,7 +94,7 @@ CCefClientDelegate::onPreKeyEvent(CefRefPtr<CefBrowser> browser,
     return true;
   }
 #else
-  XKeyEvent* xevent = static_cast<XKeyEvent*>(os_event.get());
+  XKeyEvent* xevent = (XKeyEvent*)os_event;
   if (xevent == nullptr) {
     return false;
   }
