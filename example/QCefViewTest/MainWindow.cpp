@@ -101,7 +101,8 @@ MainWindow::createRightCefView()
   // m_pRightCefViewWidget = new CefViewWidget("https://cefview.github.io/QCefView/", &setting, this);
 
   //
-  m_pRightCefViewWidget = new CefViewWidget("http://html5test.com/", &setting, this);
+  //m_pRightCefViewWidget = new CefViewWidget("http://html5test.com/", &setting, this);
+  m_pRightCefViewWidget = new CefViewWidget("http://www.baidu.com/", &setting, this);
 
   //
   // m_pRightCefViewWidget = new CefViewWidget("https://mdn.dev/", &setting, this);
@@ -231,7 +232,7 @@ void
 MainWindow::onBtnReloadRightViewClicked()
 {
   if (m_pRightCefViewWidget) {
-    m_pRightCefViewWidget->navigateToUrl("https://www.google.com");
+    m_pRightCefViewWidget->navigateToUrl("https://www.baidu.com");
   }
 }
 

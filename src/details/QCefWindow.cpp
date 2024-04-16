@@ -1,11 +1,14 @@
 ﻿#include "QCefWindow.h"
 
+#if defined(Q_OS_WIN)
+#include <windows.h>
+#endif
+
 #include <QDebug>
 
 QCefWindow::QCefWindow()
   : QWindow()
 {
-  this->setFlag(Qt::FramelessWindowHint);
 }
 
 QCefWindow::~QCefWindow()
@@ -30,9 +33,10 @@ QCefWindow::attachCefWindow(QWindow* win, QWidget* parent)
   QWindow* widgetSourceWindow = this;
 #endif
 
-  return QWidget::createWindowContainer(widgetSourceWindow, //
-                                        parent,             //
-                                        Qt::WindowTransparentForInput | Qt::WindowDoesNotAcceptFocus);
+  cefWidget_ = QWidget::createWindowContainer(widgetSourceWindow, //
+                                              parent,             //
+                                              Qt::WindowTransparentForInput | Qt::WindowDoesNotAcceptFocus);
+  return cefWidget_;
 }
 
 void
@@ -43,9 +47,12 @@ QCefWindow::detachCefWindow()
 
 #else
     cefWindow_->hide();
+#if defined(Q_OS_LINUX)
     cefWindow_->setParent(nullptr);
 #endif
+#endif
     cefWindow_ = nullptr;
+    cefWidget_ = nullptr;
   }
 }
 
@@ -68,13 +75,47 @@ QCefWindow::cefWindow()
 }
 
 void
+QCefWindow::syncCefWindowPos()
+{
+#if defined(Q_OS_WIN)
+  if (cefWidget_ && cefWindow_ && cefWindow_->winId()) {
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    qreal scaleFactor = cefWidget_->devicePixelRatioF();
+#else
+    qreal scaleFactor = cefWidget_->devicePixelRatio();
+#endif
+    auto w = width() * scaleFactor;
+    auto h = height() * scaleFactor;
+    ::SetWindowPos((HWND)(cefWindow_->winId()),
+                   NULL,
+                   0,
+                   0,
+                   w,
+                   h,
+                   SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSENDCHANGING | SWP_DEFERERASE);
+  }
+#endif
+}
+
+void
+QCefWindow::exposeEvent(QExposeEvent* e)
+{
+#if defined(Q_OS_WIN)
+  syncCefWindowPos();
+#endif
+}
+
+void
 QCefWindow::resizeEvent(QResizeEvent* e)
 {
-#if defined(Q_OS_MACOS)
-#else
+#if defined(Q_OS_WIN)
+  syncCefWindowPos();
+#elif defined(Q_OS_LINUX)
   if (cefWindow_) {
     cefWindow_->resize(e->size());
   }
+#else
+  // do nothing
 #endif
   QWindow::resizeEvent(e);
 }

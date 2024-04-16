@@ -1,4 +1,4 @@
-#include "CefViewWidget.h"
+﻿#include "CefViewWidget.h"
 
 #if defined(Q_OS_WIN)
 #include <windows.h>

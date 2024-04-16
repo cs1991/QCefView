@@ -9,3 +9,4 @@ docs/doxygen/xml
 out
 .vs
 scripts/doxygen/xml
+include/QCefView_global.h

@@ -89,14 +89,27 @@ QCefViewPrivate::createCefBrowser(QCefView* view, const QString& url, const QCef
     windowInfo.SetAsWindowless(0);
   } else {
     // create CEF browser parent window
+    auto initSize = q_ptr->size();
+    if (setting) {
+      initSize = setting->initSize();
+    }
+    qDebug() << "Browser init size:" << initSize;
+
     ncw.qBrowserWindow_ = new QCefWindow();
+    ncw.qBrowserWindow_->resize(initSize);
     ncw.qBrowserWindow_->setFlags(Qt::Window | Qt::FramelessWindowHint);
 
-    // use INT_MAX as the width and height to prevent black screen blink
-#if CEF_VERSION_MAJOR > 85
-    windowInfo.SetAsChild((CefWindowHandle)ncw.qBrowserWindow_->winId(), { 0, 0, INT_MAX, INT_MAX });
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 6, 0))
+    qreal scaleFactor = q_ptr->devicePixelRatioF();
 #else
-    windowInfo.SetAsChild((CefWindowHandle)ncw.qBrowserWindow_->winId(), 0, 0, INT_MAX, INT_MAX);
+    qreal scaleFactor = q_ptr->devicePixelRatio();
+#endif
+    auto width = initSize.width() * scaleFactor;
+    auto height = initSize.height() * scaleFactor;
+#if CEF_VERSION_MAJOR > 85
+    windowInfo.SetAsChild((CefWindowHandle)ncw.qBrowserWindow_->winId(), { 0, 0, (int)width, (int)height });
+#else
+    windowInfo.SetAsChild((CefWindowHandle)ncw.qBrowserWindow_->winId(), 0, 0, (int)width, (int)height);
 #endif
   }
 
@@ -187,6 +200,12 @@ QCefViewPrivate::isOSRModeEnabled() const
   return isOSRModeEnabled_;
 }
 
+QCefQuery
+QCefViewPrivate::createQuery(const QString& req, const int64_t id)
+{
+  return QCefQuery(this, req, id);
+}
+
 void
 QCefViewPrivate::onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* window)
 {
@@ -198,22 +217,22 @@ QCefViewPrivate::onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* win
     browser->GetMainFrame()->LoadURL(lastUrl_);
   }
 
+  // monitor the screenChanged signal from the top-level window
+  if (q_ptr->window()->windowHandle()) {
+    connect(q_ptr->window()->windowHandle(),     //
+            SIGNAL(screenChanged(QScreen*)),     //
+            this,                                //
+            SLOT(onViewScreenChanged(QScreen*)), //
+            Qt::UniqueConnection                 //
+    );
+  }
+
   if (isOSRModeEnabled_) {
     // OSR mode
     // notify the visibility and size
     pCefBrowser_->GetHost()->WasHidden(!q_ptr->isVisible());
     pCefBrowser_->GetHost()->WasResized();
     connect(this, SIGNAL(updateOsrFrame()), q_ptr, SLOT(update()));
-
-    // monitor the screenChanged signal from the top-level window
-    disconnect(this, SLOT(onViewScreenChanged(QScreen*)));
-    if (q_ptr->window()->windowHandle()) {
-      connect(q_ptr->window()->windowHandle(),    //
-              SIGNAL(screenChanged(QScreen*)),    //
-              this,                               //
-              SLOT(onViewScreenChanged(QScreen*)) //
-      );
-    }
   } else {
     // emit signal
     emit q_ptr->nativeBrowserCreated(window);
@@ -235,6 +254,7 @@ QCefViewPrivate::onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* win
     ncw.qBrowserWindow_->applyMask(q_ptr->mask());
 
     // resize to eliminate flicker
+    qDebug() << "Host QCefView size:" << q_ptr->size();
     ncw.qBrowserWidget_->resize(q_ptr->size());
 
     // initialize the layout and add browser widget to the layout
@@ -243,11 +263,11 @@ QCefViewPrivate::onCefBrowserCreated(CefRefPtr<CefBrowser> browser, QWindow* win
     layout->addWidget(ncw.qBrowserWidget_);
 
     // monitor the focus changed event globally
-    disconnect(this, SLOT(onAppFocusChanged(QWidget*, QWidget*)));
-    connect(qApp,                                       //
-            SIGNAL(focusChanged(QWidget*, QWidget*)),   //
-            this,                                       //
-            SLOT(onAppFocusChanged(QWidget*, QWidget*)) //
+    connect(qApp,                                        //
+            SIGNAL(focusChanged(QWidget*, QWidget*)),    //
+            this,                                        //
+            SLOT(onAppFocusChanged(QWidget*, QWidget*)), //
+            Qt::UniqueConnection                         //
     );
   }
 }
@@ -372,12 +392,18 @@ QCefViewPrivate::onAppFocusChanged(QWidget* old, QWidget* now)
 void
 QCefViewPrivate::onViewScreenChanged(QScreen* screen)
 {
+  Q_Q(QCefView);
+
+  // no matter what reason, we need to update the geometry
+  // because some system/Qt version will not notify the new
+  // size information correctly when screen change
+  q->updateGeometry();
+
   if (isOSRModeEnabled_) {
     // OSR mode
     if (pCefBrowser_)
       pCefBrowser_->GetHost()->NotifyScreenInfoChanged();
   } else {
-    Q_Q(QCefView);
     if (ncw.qBrowserWindow_)
       ncw.qBrowserWindow_->applyMask(q->mask());
   }
@@ -715,23 +741,23 @@ QCefViewPrivate::eventFilter(QObject* watched, QEvent* event)
   }
 #endif
 
-  if (isOSRModeEnabled_) {
-    // if the parent chain changed, we need to re-connect the screenChanged signal
-    if (et == QEvent::ParentChange) {
-      QWidget* w = qobject_cast<QWidget*>(watched);
-      if (w && (w == q || w->isAncestorOf(q))) {
-        // reconnect the screenChanged
-        disconnect(this, SLOT(onViewScreenChanged(QScreen*)));
-        if (q->window()->windowHandle()) {
-          connect(q->window()->windowHandle(),        //
-                  SIGNAL(screenChanged(QScreen*)),    //
-                  this,                               //
-                  SLOT(onViewScreenChanged(QScreen*)) //
-          );
-        }
+  // if the parent chain changed, we need to re-connect the screenChanged signal
+  if (et == QEvent::ParentChange) {
+    QWidget* w = qobject_cast<QWidget*>(watched);
+    if (w && (w == q || w->isAncestorOf(q))) {
+      // reconnect the screenChanged
+      if (q->window()->windowHandle()) {
+        connect(q->window()->windowHandle(),         //
+                SIGNAL(screenChanged(QScreen*)),     //
+                this,                                //
+                SLOT(onViewScreenChanged(QScreen*)), //
+                Qt::UniqueConnection                 //
+        );
       }
     }
+  }
 
+  if (isOSRModeEnabled_) {
     if (watched == q && (et == QEvent::Type::KeyPress || et == QEvent::Type::KeyRelease)) {
       QKeyEvent* ke = (QKeyEvent*)event;
       if (ke->key() == Qt::Key_Tab || ke->key() == Qt::Key_Backtab) {
@@ -829,6 +855,14 @@ QCefViewPrivate::onViewInputMethodEvent(QInputMethodEvent* event)
 void
 QCefViewPrivate::onViewVisibilityChanged(bool visible)
 {
+  if (q_ptr->window()->windowHandle()) {
+    connect(q_ptr->window()->windowHandle(),     //
+            SIGNAL(screenChanged(QScreen*)),     //
+            this,                                //
+            SLOT(onViewScreenChanged(QScreen*)), //
+            Qt::UniqueConnection);
+  }
+
   // tell cef to start/stop rendering
   if (isOSRModeEnabled_) {
     // OSR mode
@@ -839,15 +873,18 @@ QCefViewPrivate::onViewVisibilityChanged(bool visible)
     if (!ncw.qBrowserWidget_)
       return;
 
-    if (visible) {
-      // restore cef window size
-      ncw.qBrowserWidget_->resize(q->frameSize());
-    } else {
-      // set cef window size to 0x0 to stop rendering and reduce resource usage
-      // please refer to:
-      // https://bitbucket.org/chromiumembedded/cef/issues/2310/allow-cefbrowser-washidden-to-work-for
-      ncw.qBrowserWidget_->resize(0, 0);
-    }
+    //// for better user experience (eliminate flicker), we don't change the size here
+    //// if the consumer of QCefView need to constraint the resource
+    //// then they need to handle the size change themselves
+    // if (visible) {
+    //   // restore cef window size
+    //   ncw.qBrowserWidget_->resize(q->frameSize());
+    // } else {
+    //   // set cef window size to 0x0 to stop rendering and reduce resource usage
+    //   // please refer to:
+    //   // https://bitbucket.org/chromiumembedded/cef/issues/2310/allow-cefbrowser-washidden-to-work-for
+    //   ncw.qBrowserWidget_->resize(0, 0);
+    // }
   }
 }
 
@@ -1115,7 +1152,19 @@ QCefViewPrivate::responseQCefQuery(const QCefQuery& query)
   if (pClient_) {
     CefString res;
     res.FromString(query.response().toStdString());
+    query.markAsReplied();
     return pClient_->ResponseQuery(query.id(), query.result(), res, query.error());
+  }
+  return false;
+}
+
+bool
+QCefViewPrivate::responseQCefQuery(const int64_t query, bool success, const QString& response, int error)
+{
+  if (pClient_) {
+    CefString res;
+    res.FromString(response.toStdString());
+    return pClient_->ResponseQuery(query, success, res, error);
   }
   return false;
 }
@@ -1127,22 +1176,22 @@ QCefViewPrivate::executeJavascript(int64_t frameId, const QString& code, const Q
     return false;
 
   if (pCefBrowser_) {
-    CefRefPtr<CefFrame> frame = pCefBrowser_->GetFrame(frameId);
-    if (frame) {
-      CefString c;
-      c.FromString(code.toStdString());
+    auto frame = frameId == 0 ? pCefBrowser_->GetMainFrame() : pCefBrowser_->GetFrame(frameId);
+    if (!frame)
+      return false;
 
-      CefString u;
-      if (url.isEmpty()) {
-        u = frame->GetURL();
-      } else {
-        u.FromString(url.toStdString());
-      }
+    CefString c;
+    c.FromString(code.toStdString());
 
-      frame->ExecuteJavaScript(c, u, 0);
-
-      return true;
+    CefString u;
+    if (url.isEmpty()) {
+      u = frame->GetURL();
+    } else {
+      u.FromString(url.toStdString());
     }
+
+    frame->ExecuteJavaScript(c, u, 0);
+    return true;
   }
 
   return false;
@@ -1157,7 +1206,7 @@ QCefViewPrivate::executeJavascriptWithResult(int64_t frameId,
   if (code.isEmpty())
     return false;
 
-  if (pClient_) {
+  if (pClient_ && pCefBrowser_) {
     auto frame = frameId == 0 ? pCefBrowser_->GetMainFrame() : pCefBrowser_->GetFrame(frameId);
     if (!frame)
       return false;
@@ -1195,6 +1244,10 @@ QCefViewPrivate::notifyMoveOrResizeStarted()
 bool
 QCefViewPrivate::sendEventNotifyMessage(int64_t frameId, const QString& name, const QVariantList& args)
 {
+  if (!pClient_) {
+    return false;
+  }
+
   CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create(kCefViewClientBrowserTriggerEventMessage);
   CefRefPtr<CefListValue> arguments = msg->GetArgumentList();
 
