@@ -35,7 +35,6 @@ class QCEFVIEW_EXPORT QCefView : public QWidget
   Q_DECLARE_PRIVATE(QCefView)
   Q_DISABLE_COPY(QCefView)
   QScopedPointer<QCefViewPrivate> d_ptr;
-  QScopedPointer<QCefDevtoolsView> dev_ptr;
 
 public:
   /// <summary>
@@ -276,8 +275,10 @@ signals:
   void quitKeyEvent();
   // alt+M 最小化键盘事件
   void minKeyEvent();
-  // 调试窗口
-  void showDevToolsEvent();
+  // keyboard event
+  void keyBoardEvent(bool isCtrlDown, bool isShiftDown, bool isAltDown, bool isWinDown, QString keycode);
+#ifdef Q_OS_WIN
+#endif
   /// <summary>
   /// Gets called on loading state changed
   /// </summary>
@@ -405,10 +406,7 @@ signals:
   void nativeBrowserCreated(QWindow* window);
 
 protected:
-	  /// 打开和关闭devtools
-  /// </summary>
-  void onShowDevtools();
-  void closeDevtools();
+
   /// <summary>
   /// Gets called before a new browser created (only for browser created by non-JavaScript)
   /// </summary>

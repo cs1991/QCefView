@@ -19,6 +19,7 @@ CCefClientDelegate::onBeforePopup(CefRefPtr<CefBrowser>& browser,
                                   CefBrowserSettings& settings,
                                   bool& disableJavascriptAccess)
 {
+    printf("###onBeforePopup enter\n");
   bool cancel = true;
   if (!pCefViewPrivate_) {
     return cancel;
@@ -44,8 +45,12 @@ CCefClientDelegate::onBeforePopup(CefRefPtr<CefBrowser>& browser,
 
   QCefSetting s;
   QCefSettingPrivate::CopyFromCefBrowserSettings(&s, &settings);
+#if CEF_VERSION_MAJOR > 113
+      if (targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::CEF_WOD_NEW_POPUP) {
+#else
+    if (targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_POPUP) {
+#endif
 
-  if (targetDisposition == CefLifeSpanHandler::WindowOpenDisposition::WOD_NEW_POPUP) {
     // the new browser was created from javascript, we need to conform the CEF pop-up browser lifecycle
     // because CEF need to return the new browser identity to javascript context
     Qt::ConnectionType c = pCefViewPrivate_->q_ptr->thread() == QThread::currentThread() ? Qt::DirectConnection

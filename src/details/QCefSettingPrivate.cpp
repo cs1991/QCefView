@@ -35,9 +35,12 @@ QCefSettingPrivate::CopyFromCefBrowserSettings(QCefSetting* qs, const CefBrowser
   qs->d_ptr->fantasyFontFamily_ = CefString(&cs->fantasy_font_family).ToString();
 
   qs->d_ptr->defaultEncoding_ = CefString(&cs->default_encoding).ToString();
-
+#if CEF_VERSION_MAJOR > 113
+  QString language = QCefContext::instance()->cefConfig()->acceptLanguageList();
+  qs->d_ptr->acceptLanguageList_ = language.toStdString();
+#else
   qs->d_ptr->acceptLanguageList_ = CefString(&cs->accept_language_list).ToString();
-
+#endif
   qs->d_ptr->windowlessFrameRate_ = cs->windowless_frame_rate;
 
   qs->d_ptr->defaultFontSize_ = cs->default_font_size;
@@ -125,8 +128,11 @@ QCefSettingPrivate::CopyToCefBrowserSettings(const QCefSetting* qs, CefBrowserSe
   if (!qs->d_ptr->defaultEncoding_.empty())
     CefString(&cs->default_encoding) = qs->d_ptr->defaultEncoding_;
 
-  if (!qs->d_ptr->acceptLanguageList_.empty())
-    CefString(&cs->accept_language_list) = qs->d_ptr->acceptLanguageList_;
+  if (!qs->d_ptr->acceptLanguageList_.empty()){
+#if CEF_VERSION_MAJOR < 113
+      CefString(&cs->accept_language_list) = qs->d_ptr->acceptLanguageList_;
+#endif
+  }
 
   if (qs->d_ptr->windowlessFrameRate_.canConvert<int>())
     cs->windowless_frame_rate = qs->d_ptr->windowlessFrameRate_.toInt();

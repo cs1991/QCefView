@@ -671,30 +671,34 @@ QCefViewPrivate::hasDevTools()
 
   return false;
 }
-
+#include "QCefDevtoolsView.h"
 void
 QCefViewPrivate::showDevTools()
 {
   if (pCefBrowser_) {
-    CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
-    if (host) {
-      CefWindowInfo info;
-      CefBrowserSettings settings;
-      CefPoint point;
-      host->ShowDevTools(info, nullptr, settings, point);
-    }
+      CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
+      if (host) {
+        CefWindowInfo info;
+#ifdef Q_OS_WIN
+        info.ex_style |= WS_EX_TOPMOST;
+        info.SetAsPopup(host->GetWindowHandle(), "DevTools");
+#endif
+        CefBrowserSettings settings;
+        CefPoint point;
+        host->ShowDevTools(info, pClient_, settings, point);
+      }
   }
 }
 
 void
 QCefViewPrivate::closeDevTools()
 {
-  if (pCefBrowser_) {
-    CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
-    if (host) {
-      host->CloseDevTools();
+    if (pCefBrowser_) {
+        CefRefPtr<CefBrowserHost> host = pCefBrowser_->GetHost();
+        if (host) {
+            host->CloseDevTools();
+        }
     }
-  }
 }
 
 bool

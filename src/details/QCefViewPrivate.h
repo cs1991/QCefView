@@ -17,7 +17,7 @@
 #include "QCefContextPrivate.h"
 #include "QCefWindow.h"
 #include "utils/MenuBuilder.h"
-
+#include "../QCefDevtoolsView.h"
 #include <QCefView.h>
 
 class QCefViewPrivate : public QObject
@@ -30,7 +30,7 @@ class QCefViewPrivate : public QObject
 
 private:
   static QSet<QCefViewPrivate*> sLiveInstances;
-
+  QCefSetting m_setting;
 public:
   /// <summary>
   ///

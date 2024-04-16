@@ -12,11 +12,12 @@ main(int argc, char* argv[])
   // For off-screen rendering, Qt::AA_EnableHighDpiScaling must be enabled. If not,
   // then all devicePixelRatio methods will always return 1.0,
   // so CEF will not scale the web content
-  // NOET: There is bugs in Qt 6.2.4, the HighDpi doesn't work 
+  // NOET: There is bugs in Qt 6.2.4, the HighDpi doesn't work
   QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
   QApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 #endif
 
+  QCoreApplication::setAttribute(Qt::AA_DisableHighDpiScaling);
   // create QApplication instance
   QApplication a(argc, argv);
 
@@ -36,11 +37,11 @@ main(int argc, char* argv[])
 
   // WindowlessRenderingEnabled is set to true by default,
   // set to false to disable the OSR mode
-  config.setWindowlessRenderingEnabled(true);
+  config.setWindowlessRenderingEnabled(false);
 
   // add command line args, you can any cef supported switches or parameters
   config.addCommandLineSwitch("use-mock-keychain");
-  // config.addCommandLineSwitch("disable-gpu");
+  config.addCommandLineSwitch("disable-gpu");
   // config.addCommandLineSwitch("enable-media-stream");
   // config.addCommandLineSwitch("allow-file-access-from-files");
   // config.addCommandLineSwitch("disable-spell-checking");
@@ -55,7 +56,7 @@ main(int argc, char* argv[])
   // cef bugs on macOS debug build
   config.setCachePath(QDir::tempPath());
 #endif
-  
+
   // create QCefContext instance with config,
   // the lifecycle of cefContext must be the same as QApplication instance
   QCefContext cefContext(&a, argc, argv, &config);

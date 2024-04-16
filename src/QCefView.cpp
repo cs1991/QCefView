@@ -33,7 +33,6 @@ QCefView::QCefView(const QString& url,
   setMouseTracking(true);
   setFocusPolicy(Qt::WheelFocus);
 
-  connect(this, &QCefView::showDevToolsEvent, this, &QCefView::onShowDevtools);
   // create browser
   d_ptr->createCefBrowser(this, url, setting);
 }
@@ -46,39 +45,14 @@ QCefView::QCefView(QWidget* parent /*= 0*/, Qt::WindowFlags f /*= Qt::WindowFlag
 QCefView::~QCefView()
 {
   qDebug() << this << "is being destructed";
-  if (dev_ptr) {
-    dev_ptr->close();
-    dev_ptr.reset();
-  }
+
   if (d_ptr) {
     // destroy under layer cef browser
     d_ptr->destroyCefBrowser();
     d_ptr.reset();
   }
 }
-void
-QCefView::onShowDevtools()
-{
-  if (!dev_ptr) {
-    QCefDevtoolsView *dev = new QCefDevtoolsView(d_ptr->pCefBrowser_, d_ptr->pClient_, this);
-    connect(dev, &QCefDevtoolsView::OnClose, this, [&]() {
-      d_ptr->pCefBrowser_->GetHost()->CloseDevTools();
-      dev_ptr.reset();
-    });
-    dev_ptr.reset(dev);
-  }
-  dev_ptr->show();
-  dev_ptr->raise();
-  dev_ptr->activateWindow();
-}
-void
-QCefView::closeDevtools()
-{
-  if (dev_ptr) {
-    dev_ptr->close();
-    dev_ptr.reset();
-  }
-}
+
 void
 QCefView::addLocalFolderResource(const QString& path, const QString& url, int priority /*= 0*/)
 {
