@@ -1,4 +1,4 @@
-﻿#include "MainWindow.h"
+#include "MainWindow.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -63,7 +63,8 @@ MainWindow::createLeftCefView()
     m_pLeftCefViewWidget = nullptr;
   }
 
-  m_pLeftCefViewWidget = new CefViewWidget(INDEX_URL, nullptr, this);
+  //m_pLeftCefViewWidget = new CefViewWidget(INDEX_URL, nullptr, this);
+  m_pLeftCefViewWidget = new CefViewWidget("http://html5test.com/", nullptr, this);
   // connect the invokeMethod to the slot
   connect(m_pLeftCefViewWidget, &QCefView::invokeMethod, this, &MainWindow::onInvokeMethod);
 
@@ -93,7 +94,7 @@ MainWindow::createRightCefView()
   setting.setPlugins(false);
 #endif
 
-  setting.setWindowlessFrameRate(60);
+  //setting.setWindowlessFrameRate(60);
   setting.setBackgroundColor(QColor::fromRgba(qRgba(255, 255, 220, 255)));
   // setting.setBackgroundColor(Qt::blue);
 
@@ -101,8 +102,8 @@ MainWindow::createRightCefView()
   // m_pRightCefViewWidget = new CefViewWidget("https://cefview.github.io/QCefView/", &setting, this);
 
   //
+  m_pRightCefViewWidget = new CefViewWidget("http://html5test.com/", nullptr, this);
   //m_pRightCefViewWidget = new CefViewWidget("http://html5test.com/", &setting, this);
-  m_pRightCefViewWidget = new CefViewWidget("http://www.baidu.com/", &setting, this);
 
   //
   // m_pRightCefViewWidget = new CefViewWidget("https://mdn.dev/", &setting, this);
@@ -116,7 +117,7 @@ MainWindow::createRightCefView()
   m_ui.rightCefViewContainer->layout()->addWidget(m_pRightCefViewWidget);
 
   // allow show context menu for both OSR and NCW mode
-  m_pRightCefViewWidget->setContextMenuPolicy(Qt::DefaultContextMenu);
+  //m_pRightCefViewWidget->setContextMenuPolicy(Qt::DefaultContextMenu);
 
   // all the following values will disable the context menu for both NCW and OSR mode
   // m_pRightCefViewWidget->setContextMenuPolicy(Qt::NoContextMenu);
@@ -232,7 +233,7 @@ void
 MainWindow::onBtnReloadRightViewClicked()
 {
   if (m_pRightCefViewWidget) {
-    m_pRightCefViewWidget->navigateToUrl("https://www.baidu.com");
+    m_pRightCefViewWidget->navigateToUrl("http://html5test.com/");
   }
 }
 
